@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>知识卡片生成器 · 本地版</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">卡</span> make-knowledge-cards</div>
+    <h1>把文章变成知识卡片</h1>
+    <p class="subtitle">粘贴正文或上传 Markdown / TXT，本地抽取 5~8 张卡片</p>
+    <span class="badge">本地规则版 · 不联网 · 内容不离开你的浏览器</span>
+  </header>
+
+  <main class="layout">
+    <section class="panel">
+      <h2>输入文章</h2>
+      <p class="hint">支持直接粘贴，或选择 / 拖入 .md、.markdown、.txt 文件（最大 2 MB）。</p>
+      <textarea id="source" placeholder="在这里粘贴文章正文……"></textarea>
+      <label class="dropzone" id="dropzone">
+        点击选择文件，或把文件拖到这里
+        <input type="file" id="file" accept=".md,.markdown,.txt,text/plain,text/markdown">
+      </label>
+      <div class="actions">
+        <button class="btn-primary" id="generate">生成卡片</button>
+        <button class="btn-ghost" id="clear">清空</button>
+      </div>
+      <div class="meta" id="meta"></div>
+    </section>
+
+    <section class="panel">
+      <div class="results-head">
+        <div>
+          <h2>生成的卡片</h2>
+          <p class="hint" id="count" style="margin:0">尚未生成</p>
+        </div>
+        <div class="group">
+          <button class="btn-ghost" id="copy" disabled>复制 Markdown</button>
+          <button class="btn-ghost" id="download" disabled>下载 .md</button>
+        </div>
+      </div>
+      <div id="results" class="empty">点击「生成卡片」后，结果会显示在这里。</div>
+      <div id="note"></div>
+    </section>
+  </main>
+
+  <footer>
+    本页为<strong>本地规则版</strong>：按原文句子和关键词抽取，不做语义改写，不补充原文没有的信息。
+    想要真正理解文章并高质量提炼，请使用项目中的 <code>make-knowledge-cards</code> Skill。
+  </footer>
+
+  <script src="app.js"></script>
+  <script>
+    (function () {
+      var source = document.getElementById('source');
+      var fileInput = document.getElementById('file');
+      var dropzone = document.getElementById('dropzone');
+      var generateBtn = document.getElementById('generate');
+      var clearBtn = document.getElementById('clear');
+      var copyBtn = document.getElementById('copy');
+      var downloadBtn = document.getElementById('download');
+      var results = document.getElementById('results');
+      var count = document.getElementById('count');
+      var meta = document.getElementById('meta');
+      var noteBox = document.getElementById('note');
+      var lastMarkdown = '';
+
+      function setMeta(message) { meta.textContent = message || ''; }
+
+      function readFile(file) {
+        if (!file) return;
+        var name = file.name.toLowerCase();
+        if (!/\.(md|markdown|txt)$/.test(name)) {
+          setMeta('仅支持 .md / .markdown / .txt 文件。');
+          return;
+        }
+        if (file.size > 2 * 1024 * 1024) {
+          setMeta('文件过大，请选择 2 MB 以内的文件。');
+          return;
+        }
+        var reader = new FileReader();
+        reader.onload = function () {
+          source.value = String(reader.result || '');
+          setMeta('已载入：' + file.name + '（' + source.value.length + ' 字）');
+        };
+        reader.onerror = function () { setMeta('文件读取失败，请重试。'); };
+        reader.readAsText(file, 'UTF-8');
+      }
+
+      fileInput.addEventListener('change', function () { readFile(fileInput.files[0]); });
+
+      ['dragenter', 'dragover'].forEach(function (evt) {
+        dropzone.addEventListener(evt, function (e) {
+          e.preventDefault();
+          dropzone.classList.add('drag');
+        });
+      });
+      ['dragleave', 'drop'].forEach(function (evt) {
+        dropzone.addEventListener(evt, function (e) {
+          e.preventDefault();
+          dropzone.classList.remove('drag');
+        });
+      });
+      dropzone.addEventListener('drop', function (e) {
+        readFile(e.dataTransfer.files[0]);
+      });
+
+      function field(label, value) {
+        var p = document.createElement('p');
+        var strong = document.createElement('span');
+        strong.className = 'label';
+        strong.textContent = label + '：';
+        p.appendChild(strong);
+        p.appendChild(document.createTextNode(value));
+        return p;
+      }
+
+      function render(result) {
+        results.textContent = '';
+        noteBox.textContent = '';
+        results.className = '';
+
+        if (!result.cards.length) {
+          results.className = 'empty';
+          results.textContent = result.note || '未能生成卡片。';
+          count.textContent = '未生成';
+          copyBtn.disabled = true;
+          downloadBtn.disabled = true;
+          lastMarkdown = '';
+          return;
+        }
+
+        result.cards.forEach(function (card, index) {
+          var el = document.createElement('article');
+          el.className = 'card';
+          var no = document.createElement('span');
+          no.className = 'card-no';
+          no.textContent = '#' + (index + 1);
+          var h3 = document.createElement('h3');
+          h3.textContent = card.title;
+          el.appendChild(no);
+          el.appendChild(h3);
+          el.appendChild(field('核心知识', card.core));
+          el.appendChild(field('简明解释', card.explanation));
+          el.appendChild(field(card.fieldLabel, card.fieldValue));
+          results.appendChild(el);
+        });
+
+        count.textContent = '共 ' + result.cards.length + ' 张卡片';
+        if (result.note) {
+          var n = document.createElement('div');
+          n.className = 'note';
+          n.textContent = result.note;
+          noteBox.appendChild(n);
+        }
+        lastMarkdown = KnowledgeCards.toMarkdown(result);
+        copyBtn.disabled = false;
+        downloadBtn.disabled = false;
+      }
+
+      generateBtn.addEventListener('click', function () {
+        var text = source.value.trim();
+        if (!text) {
+          setMeta('请先粘贴文章正文或选择文件。');
+          source.focus();
+          return;
+        }
+        setMeta('');
+        render(KnowledgeCards.extractCards(text, 8));
+      });
+
+      clearBtn.addEventListener('click', function () {
+        source.value = '';
+        fileInput.value = '';
+        setMeta('');
+        results.className = 'empty';
+        results.textContent = '点击「生成卡片」后，结果会显示在这里。';
+        count.textContent = '尚未生成';
+        noteBox.textContent = '';
+        copyBtn.disabled = true;
+        downloadBtn.disabled = true;
+        lastMarkdown = '';
+      });
+
+      copyBtn.addEventListener('click', function () {
+        if (!lastMarkdown) return;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(lastMarkdown).then(
+            function () { setMeta('已复制 Markdown 到剪贴板。'); },
+            function () { setMeta('复制失败，请手动选择结果文本。'); }
+          );
+        } else {
+          setMeta('当前浏览器不支持自动复制，请手动选择结果文本。');
+        }
+      });
+
+      downloadBtn.addEventListener('click', function () {
+        if (!lastMarkdown) return;
+        var blob = new Blob([lastMarkdown], { type: 'text/markdown;charset=utf-8' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'knowledge-cards.md';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        setMeta('已下载 knowledge-cards.md');
+      });
+    })();
+  </script>
+</body>
+</html>

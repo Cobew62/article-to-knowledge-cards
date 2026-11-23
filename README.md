@@ -92,6 +92,18 @@ Skill 由官方 skill-creator 的 `init_skill.py` 初始化，可用其 `quick_v
 python <skill-creator>/scripts/quick_validate.py skills/make-knowledge-cards
 ```
 
+## 网页应用（本地规则版）
+
+`web/` 是一个纯前端网页应用，可直接用浏览器打开 `web/index.html`，或在该目录运行任意静态文件服务器访问。
+
+- 支持粘贴正文，或选择 / 拖入 `.md` / `.markdown` / `.txt` 文件（最大 2 MB）。
+- 在浏览器本地按原文句子和关键词抽取并去重，输出带四个字段的卡片；不足 5 个知识点时按实际数量输出并说明。
+- 可复制为 Markdown 或下载 `knowledge-cards.md`。
+- 不联网、不上传内容、不需要账号或 API Key。
+- 局限：这是规则版，不做语义理解与改写，卡片质量不如配合大模型使用的 Skill；不会补充原文没有的信息。
+
+文件：`web/index.html`、`web/styles.css`、`web/app.js`（无构建步骤、无第三方依赖）。
+
 ## 许可证
 
 本项目采用 MIT 许可证，详见根目录 [LICENSE](LICENSE)。
